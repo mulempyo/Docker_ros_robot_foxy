@@ -40,6 +40,7 @@ double vth=0;
 double linear_velocity;
 double angular_velocity;
 double imu_yaw_rate = 0.0;
+double WHEEL_BASE = 0.212;
 
  
 ros::Time current_time;
@@ -62,11 +63,44 @@ void update_odom() {
    current_time = ros::Time::now();
    dt =(current_time-last_time).toSec();
    
-   linear_velocity = cmd_vel_.linear.x;
-   angular_velocity = cmd_vel_.angular.z;
+    double left_velocity;
+    double right_velocity;
 
-   vx = linear_velocity; 
-   vth = angular_velocity;
+    left_velocity = cmd_vel_.linear.x - (cmd_vel_.angular.z*WHEEL_BASE/2.0); 
+    right_velocity = cmd_vel_.linear.x + (cmd_vel_.angular.z*WHEEL_BASE/2.0);
+    double left_out = left_velocity;
+    double right_out = right_velocity;
+
+    if(cmd_vel_.angular.z > 0){ //left
+      right_out;
+      left_out;
+  }
+
+   else if(cmd_vel_.angular.z < 0){ //right
+     right_out;
+     left_out;
+   }
+
+   else{
+    if(cmd_vel_.linear.x > 0){ //straight 
+       right_out;
+       left_out;
+       
+    }
+    else if(cmd_vel_.linear.x < 0){ // back
+      right_out;
+      left_out;
+     
+    }
+    else{
+      right_out = 0;
+      left_out = 0;
+       
+    }
+   }
+
+   vx = (right_out + left_out)/2; 
+   vth = (right_out + left_out)/2;
 
    dist = linear_velocity * dt;
 

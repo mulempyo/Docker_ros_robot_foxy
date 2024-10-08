@@ -1,174 +1,100 @@
-/*
-Publish: /odom
-Subscribe: /cmd_vel
-
-this code is Odometry code
-it calculate odometry using /cmd_vel
-this code publish /odom topic after apply covariance
-*/
-
-
-
-
-
-#include "ros/ros.h"
-#include "std_msgs/Int32.h"
-#include <nav_msgs/Odometry.h>
-#include <sensor_msgs/Imu.h>
-#include <tf/transform_broadcaster.h>
-#include <geometry_msgs/PoseStamped.h>
+#include "rclcpp/rclcpp.hpp"
+#include "nav_msgs/msg/odometry.hpp"
+#include "sensor_msgs/msg/imu.hpp"
+#include "geometry_msgs/msg/twist.hpp"
 #include <tf2/LinearMath/Quaternion.h>
 #include <cmath>
-#include <geometry_msgs/Twist.h>
 
-// Create odometry data publishers
-ros::Publisher odom_data_pub_quat;
+class OdometryNode : public rclcpp::Node {
+public:
+    OdometryNode() : Node("cmd_vel_to_odom"), x(0), y(0), th(0), vx(0), vth(0), imu_yaw_rate(0.0), WHEEL_BASE(0.212) {
+        odom_pub_ = this->create_publisher<nav_msgs::msg::Odometry>("odom", 100);
+        cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
+            "cmd_vel", 10, std::bind(&OdometryNode::cmdCallback, this, std::placeholders::_1));
+        imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
+            "/imu/data", 100, std::bind(&OdometryNode::imuCallback, this, std::placeholders::_1));
 
-nav_msgs::Odometry odom;
-const double PI = 3.141592;
-
-double dist;
-double dth;
-double dx;
-double dy;
-double x=0;
-double y=0;
-double th=0;
-double dt;
-double vx=0;
-double vth=0;
-double linear_velocity;
-double angular_velocity;
-double imu_yaw_rate = 0.0;
-double WHEEL_BASE = 0.212;
-
- 
-ros::Time current_time;
-ros::Time last_time;
-
-geometry_msgs::Twist cmd_vel_;
-
-using namespace std;
-
-void cmdCallback(const geometry_msgs::Twist cmd_vel){
-    cmd_vel_ = cmd_vel;
-}
-
-void imuCallback(const sensor_msgs::Imu::ConstPtr& msg) {
-    imu_yaw_rate = msg->angular_velocity.z;
-}
- 
-// Update odometry information
-void update_odom() { 
-   current_time = ros::Time::now();
-   dt =(current_time-last_time).toSec();
-   
-    double left_velocity;
-    double right_velocity;
-
-    left_velocity = cmd_vel_.linear.x - (cmd_vel_.angular.z*WHEEL_BASE/2.0); 
-    right_velocity = cmd_vel_.linear.x + (cmd_vel_.angular.z*WHEEL_BASE/2.0);
-    double left_out = left_velocity;
-    double right_out = right_velocity;
-
-    if(cmd_vel_.angular.z > 0){ //left
-      right_out;
-      left_out;
-  }
-
-   else if(cmd_vel_.angular.z < 0){ //right
-     right_out;
-     left_out;
-   }
-
-   else{
-    if(cmd_vel_.linear.x > 0){ //straight 
-       right_out;
-       left_out;
-       
+        last_time_ = this->get_clock()->now();
+        timer_ = this->create_wall_timer(
+            33ms, std::bind(&OdometryNode::update_odom, this)); // Update at 30Hz
     }
-    else if(cmd_vel_.linear.x < 0){ // back
-      right_out;
-      left_out;
-     
+
+private:
+    void cmdCallback(const geometry_msgs::msg::Twist::SharedPtr msg) {
+        cmd_vel_ = *msg;
     }
-    else{
-      right_out = 0;
-      left_out = 0;
-       
+
+    void imuCallback(const sensor_msgs::msg::Imu::SharedPtr msg) {
+        imu_yaw_rate = msg->angular_velocity.z;
     }
-   }
 
-   vx = (right_out + left_out)/2; 
-   vth = (right_out + left_out)/2;
+    void update_odom() {
+        auto current_time = this->get_clock()->now();
+        dt = (current_time - last_time_).seconds();
 
-   dist = linear_velocity * dt;
+        double left_velocity = cmd_vel_.linear.x - (cmd_vel_.angular.z * WHEEL_BASE / 2.0);
+        double right_velocity = cmd_vel_.linear.x + (cmd_vel_.angular.z * WHEEL_BASE / 2.0);
 
-   dth = imu_yaw_rate * dt;
-   dx = dist*cos(th);
-   dy = dist*sin(th);
+        double dist = (left_velocity + right_velocity) / 2.0 * dt;
+        double dth = imu_yaw_rate * dt;
 
-   x += dx;
-   y += dy;
-   th += dth;
-   th = fmod(th + 2 * PI, 2 * PI);
+        double dx = dist * cos(th);
+        double dy = dist * sin(th);
 
-   geometry_msgs::Quaternion odom_quat =tf::createQuaternionMsgFromYaw(th);
+        x += dx;
+        y += dy;
+        th += dth;
+        th = fmod(th + 2 * M_PI, 2 * M_PI);
 
-   odom.header.stamp = current_time;
-   odom.header.frame_id = "odom";
-   odom.child_frame_id = "base_footprint";
- 
-   odom.pose.pose.position.x = x; 
-   odom.pose.pose.position.y = y;
-   odom.pose.pose.orientation = odom_quat;
+        geometry_msgs::msg::Quaternion odom_quat;
+        odom_quat = tf2::toMsg(tf2::Quaternion(0, 0, th));
 
-   if (dt > 0) {
-     odom.twist.twist.linear.x = vx;
-     odom.twist.twist.linear.y = 0;
-     odom.twist.twist.angular.z = vth;
-   } else {
-     odom.twist.twist.linear.x = 0;
-     odom.twist.twist.linear.y = 0;
-     odom.twist.twist.angular.z = 0;
-   }
- 
-   last_time = current_time;
-  
+        nav_msgs::msg::Odometry odom_msg;
+        odom_msg.header.stamp = current_time;
+        odom_msg.header.frame_id = "odom";
+        odom_msg.child_frame_id = "base_footprint";
 
-   for(int i = 0; i<36; i++) {
-     if(i == 0 || i == 7 || i == 14) {
-       odom.pose.covariance[i] = 0.01;
-      }
-      else if (i == 21 || i == 28 || i== 35) {
-        odom.pose.covariance[i] = 0.1;
-      }
-      else {
-        odom.pose.covariance[i] = 0;
-      }
-   } 
-   
-   odom_data_pub_quat.publish(odom);
-}
- 
+        odom_msg.pose.pose.position.x = x;
+        odom_msg.pose.pose.position.y = y;
+        odom_msg.pose.pose.orientation = odom_quat;
+
+        odom_msg.twist.twist.linear.x = (dt > 0) ? dist / dt : 0.0;
+        odom_msg.twist.twist.angular.z = (dt > 0) ? dth / dt : 0.0;
+
+        for (int i = 0; i < 36; i++) {
+            if (i == 0 || i == 7 || i == 14) {
+                odom_msg.pose.covariance[i] = 0.01;
+            } else if (i == 21 || i == 28 || i == 35) {
+                odom_msg.pose.covariance[i] = 0.1;
+            } else {
+                odom_msg.pose.covariance[i] = 0.0;
+            }
+        }
+
+        odom_pub_->publish(odom_msg);
+        last_time_ = current_time;
+    }
+
+    rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
+    rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;
+    rclcpp::Subscription<sensor_msgs::msg::Imu>::SharedPtr imu_sub_;
+
+    rclcpp::TimerBase::SharedPtr timer_;
+
+    geometry_msgs::msg::Twist cmd_vel_;
+    rclcpp::Time last_time_;
+
+    double x, y, th;
+    double dt;
+    double vx, vth;
+    double imu_yaw_rate;
+    const double WHEEL_BASE;
+};
+
 int main(int argc, char **argv) {
-   
-  // Launch ROS and create a node
-  ros::init(argc, argv, "cmd_vel_to_odom");
-  ros::NodeHandle node;
-
-  // Subscribe to ROS topics
-  ros::Subscriber subForImu = node.subscribe("/imu/data", 100, imuCallback);
-  ros::Subscriber subForRightCounts = node.subscribe("cmd_vel", 10, cmdCallback);
-  //ros::Subscriber sub = node.subscribe("initialpose", 10, initialPoseCallback);
-  
-  // Publisher of full odom message where orientation is quaternion
-  odom_data_pub_quat = node.advertise<nav_msgs::Odometry>("odom", 100);
-  ros::Rate r(30);
-   while(ros::ok()){
-     update_odom();
-     ros::spinOnce();
-     r.sleep();
-   }
-   return 0;
+    rclcpp::init(argc, argv);
+    rclcpp::spin(std::make_shared<OdometryNode>());
+    rclcpp::shutdown();
+    return 0;
 }
+

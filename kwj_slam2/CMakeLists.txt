@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(kwj_description1)
+project(kwj_slam2)
 
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
@@ -17,9 +17,13 @@ endif()
 
 # find dependencies
 find_package(ament_cmake REQUIRED)
+find_package(nav_msgs REQUIRED)
+find_package(rclcpp REQUIRED)
+find_package(rclpy REQUIRED)
+find_package(sensor_msgs REQUIRED)
 find_package(std_msgs REQUIRED)
-find_package(urdf REQUIRED)
-find_package(xacro REQUIRED)
+find_package(tf2_ros REQUIRED)
+find_package(slam_toolbox REQUIRED)
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

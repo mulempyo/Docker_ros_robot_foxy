@@ -7,7 +7,7 @@ from launch.launch_description_sources import PythonLaunchDescriptionSource
 def generate_launch_description():
     # Get package directories
     kwj_description_pkg = get_package_share_directory('kwj_description')
-    kwj_navigation_pkg = get_package_share_directory('kwj_navigation')
+    kwj_navigation_pkg = get_package_share_directory('kwj_navigation2')
     mpc_ros_pkg = get_package_share_directory('mpc_ros')
 
     return LaunchDescription([
@@ -48,7 +48,7 @@ def generate_launch_description():
             executable='ekf_node',
             name='ekf_sensor_fusion_node',
             output='screen',
-            parameters=[kwj_navigation_pkg + '/config/ekf.yaml']
+            parameters=[kwj_navigation2 + '/config/ekf.yaml']
         ),
 
         # Move base node (converted to ROS2 equivalent)
@@ -58,11 +58,11 @@ def generate_launch_description():
             name='move_base',
             output='screen',
             parameters=[
-                kwj_navigation_pkg + '/param/costmap_common_params.yaml',
-                kwj_navigation_pkg + '/param/local_costmap_params.yaml',
-                kwj_navigation_pkg + '/param/global_costmap_params.yaml',
-                kwj_navigation_pkg + '/param/move_base_params.yaml',
-                mpc_ros_pkg + '/params/mpc_last_params.yaml'
+                kwj_navigation2 + '/param/costmap_common_params.yaml',
+                kwj_navigation2 + '/param/local_costmap_params.yaml',
+                kwj_navigation2 + '/param/global_costmap_params.yaml',
+                kwj_navigation2 + '/param/move_base_params.yaml',
+                mpc_ros_pkg + '/params/dwa_local_planner_params.yaml'
             ]
         ),
 
@@ -72,7 +72,7 @@ def generate_launch_description():
             executable='rviz2',
             name='rviz',
             output='screen',
-            arguments=['-d', kwj_navigation_pkg + '/rviz/rviz.rviz']
+            arguments=['-d', kwj_navigation2 + '/rviz/rviz.rviz']
         ),
     ])
 

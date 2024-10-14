@@ -8,7 +8,7 @@ def generate_launch_description():
     # Get package directories
     kwj_bringup_pkg = get_package_share_directory('kwj_bringup')
     kwj_description_pkg = get_package_share_directory('kwj_description')
-    kwj_navigation_pkg = get_package_share_directory('kwj_navigation')
+    kwj_navigation_pkg = get_package_share_directory('kwj_navigation2')
     
     return LaunchDescription([
         # Declare odom_topic argument

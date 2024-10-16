@@ -4,6 +4,8 @@
 #include "geometry_msgs/msg/twist.hpp"
 #include <tf2/LinearMath/Quaternion.h>
 #include <cmath>
+#include <tf2_geometry_msgs/tf2_geometry_msgs.h>
+
 
 class OdometryNode : public rclcpp::Node {
 public:
@@ -16,7 +18,8 @@ public:
 
         last_time_ = this->get_clock()->now();
         timer_ = this->create_wall_timer(
-            33ms, std::bind(&OdometryNode::update_odom, this)); // Update at 30Hz
+        std::chrono::milliseconds(33), std::bind(&OdometryNode::update_odom, this));
+
     }
 
 private:
@@ -29,51 +32,54 @@ private:
     }
 
     void update_odom() {
-        auto current_time = this->get_clock()->now();
-        dt = (current_time - last_time_).seconds();
+    auto current_time = this->get_clock()->now();
+    dt = (current_time - last_time_).seconds();
 
-        double left_velocity = cmd_vel_.linear.x - (cmd_vel_.angular.z * WHEEL_BASE / 2.0);
-        double right_velocity = cmd_vel_.linear.x + (cmd_vel_.angular.z * WHEEL_BASE / 2.0);
+    double left_velocity = cmd_vel_.linear.x - (cmd_vel_.angular.z * WHEEL_BASE / 2.0);
+    double right_velocity = cmd_vel_.linear.x + (cmd_vel_.angular.z * WHEEL_BASE / 2.0);
 
-        double dist = (left_velocity + right_velocity) / 2.0 * dt;
-        double dth = imu_yaw_rate * dt;
+    double dist = (left_velocity + right_velocity) / 2.0 * dt;
+    double dth = imu_yaw_rate * dt;
 
-        double dx = dist * cos(th);
-        double dy = dist * sin(th);
+    double dx = dist * cos(th);
+    double dy = dist * sin(th);
 
-        x += dx;
-        y += dy;
-        th += dth;
-        th = fmod(th + 2 * M_PI, 2 * M_PI);
+    x += dx;
+    y += dy;
+    th += dth;
+    th = fmod(th + 2 * M_PI, 2 * M_PI);
 
-        geometry_msgs::msg::Quaternion odom_quat;
-        odom_quat = tf2::toMsg(tf2::Quaternion(0, 0, th));
+    tf2::Quaternion quat;
+    quat.setRPY(0, 0, th);  // Roll, Pitch, Yaw
 
-        nav_msgs::msg::Odometry odom_msg;
-        odom_msg.header.stamp = current_time;
-        odom_msg.header.frame_id = "odom";
-        odom_msg.child_frame_id = "base_footprint";
+    geometry_msgs::msg::Quaternion odom_quat = tf2::toMsg(quat);
 
-        odom_msg.pose.pose.position.x = x;
-        odom_msg.pose.pose.position.y = y;
-        odom_msg.pose.pose.orientation = odom_quat;
+    nav_msgs::msg::Odometry odom_msg;
+    odom_msg.header.stamp = current_time;
+    odom_msg.header.frame_id = "odom";
+    odom_msg.child_frame_id = "base_footprint";
 
-        odom_msg.twist.twist.linear.x = (dt > 0) ? dist / dt : 0.0;
-        odom_msg.twist.twist.angular.z = (dt > 0) ? dth / dt : 0.0;
+    odom_msg.pose.pose.position.x = x;
+    odom_msg.pose.pose.position.y = y;
+    odom_msg.pose.pose.orientation = odom_quat;
 
-        for (int i = 0; i < 36; i++) {
-            if (i == 0 || i == 7 || i == 14) {
-                odom_msg.pose.covariance[i] = 0.01;
-            } else if (i == 21 || i == 28 || i == 35) {
-                odom_msg.pose.covariance[i] = 0.1;
-            } else {
-                odom_msg.pose.covariance[i] = 0.0;
-            }
+    odom_msg.twist.twist.linear.x = (dt > 0) ? dist / dt : 0.0;
+    odom_msg.twist.twist.angular.z = (dt > 0) ? dth / dt : 0.0;
+
+    for (int i = 0; i < 36; i++) {
+        if (i == 0 || i == 7 || i == 14) {
+            odom_msg.pose.covariance[i] = 0.01;
+        } else if (i == 21 || i == 28 || i == 35) {
+            odom_msg.pose.covariance[i] = 0.1;
+        } else {
+            odom_msg.pose.covariance[i] = 0.0;
         }
-
-        odom_pub_->publish(odom_msg);
-        last_time_ = current_time;
     }
+
+    odom_pub_->publish(odom_msg);
+    last_time_ = current_time;
+}
+
 
     rclcpp::Publisher<nav_msgs::msg::Odometry>::SharedPtr odom_pub_;
     rclcpp::Subscription<geometry_msgs::msg::Twist>::SharedPtr cmd_vel_sub_;

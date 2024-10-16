@@ -1,78 +1,113 @@
 from launch import LaunchDescription
 from launch.actions import DeclareLaunchArgument, IncludeLaunchDescription
 from launch_ros.actions import Node
-from ament_index_python.packages import get_package_share_directory
+from launch.substitutions import Command, LaunchConfiguration
 from launch.launch_description_sources import PythonLaunchDescriptionSource
+from ament_index_python.packages import get_package_share_directory
+import os
 
 def generate_launch_description():
-    # Get package directories
+    
     kwj_description_pkg = get_package_share_directory('kwj_description')
-    kwj_navigation_pkg = get_package_share_directory('kwj_navigation2')
-    mpc_ros_pkg = get_package_share_directory('mpc_ros')
+    gazebo_ros_pkg = get_package_share_directory('gazebo_ros')
+    kwj_localization_pkg = get_package_share_directory('kwj_localization')  
+
+    # Use xacro to process the urdf.xacro file and get the robot description
+    robot_description = Command(['ros2 run xacro xacro ', kwj_description_pkg, '/urdf/kwj.urdf.xacro'])
 
     return LaunchDescription([
-        # Declare odom_topic argument
-        DeclareLaunchArgument(
-            'odom_topic',
-            default_value='/odometry/filtered',
-            description='Odometry topic name'
-        ),
         
-        # Gazebo launch include
+        DeclareLaunchArgument(
+            'world_name',
+            default_value=[kwj_description_pkg, '/world/my_world.world'],
+            description='World file to load'
+        ),
+        DeclareLaunchArgument(
+            'paused',
+            default_value='false',
+            description='Start simulation paused'
+        ),
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='true',
+            description='Use simulation time'
+        ),
+        DeclareLaunchArgument(
+            'gui',
+            default_value='true',
+            description='Use Gazebo GUI'
+        ),
+        DeclareLaunchArgument(
+            'headless',
+            default_value='false',
+            description='Run headless'
+        ),
+        DeclareLaunchArgument(
+            'debug',
+            default_value='false',
+            description='Enable debug'
+        ),
+
+        Node(
+            package='robot_state_publisher',
+            executable='robot_state_publisher',
+            name='robot_state_publisher',
+            parameters=[{'robot_description': robot_description}]
+        ),
+
+        Node(
+            package='joint_state_publisher',
+            executable='joint_state_publisher',
+            name='joint_state_publisher',
+            parameters=[{'use_gui': LaunchConfiguration('gui')}]
+        ),
+
         IncludeLaunchDescription(
-            PythonLaunchDescriptionSource(kwj_description_pkg + '/launch/gazebo.launch.py')
+            PythonLaunchDescriptionSource(os.path.join(gazebo_ros_pkg, 'launch', 'gazebo.launch.py')),
+            launch_arguments={
+                'world': LaunchConfiguration('world_name'),
+                'paused': LaunchConfiguration('paused'),
+                'use_sim_time': LaunchConfiguration('use_sim_time'),
+                'gui': LaunchConfiguration('gui'),
+                'headless': LaunchConfiguration('headless'),
+                'debug': LaunchConfiguration('debug'),
+            }.items(),
         ),
 
-        # Map server node
         Node(
-            package='nav2_map_server',
-            executable='map_server',
-            name='map_server',
-            output='screen',
-            parameters=[{
-                'yaml_filename': kwj_navigation_pkg + '/map/carto_map.yaml'
-            }]
-        ),
-
-        # cmd_vel_to_odom node
-        Node(
-            package='kwj_localization',
-            executable='cmd_vel_to_odom',
-            name='cmd_vel_to_odom',
+            package='gazebo_ros',
+            executable='spawn_entity.py',
+            arguments=['-topic', 'robot_description', '-entity', 'KwjBot'],
             output='screen'
         ),
 
-        # EKF localization node
         Node(
             package='robot_localization',
             executable='ekf_node',
             name='ekf_sensor_fusion_node',
-            output='screen',
-            parameters=[kwj_navigation2 + '/config/ekf.yaml']
+            parameters=[os.path.join(kwj_localization_pkg, 'config', 'ekf.yaml')]  
         ),
 
-        # Move base node (converted to ROS2 equivalent)
+        # Static Transform Publishers
         Node(
-            package='nav2_bt_navigator',
-            executable='bt_navigator',
-            name='move_base',
-            output='screen',
-            parameters=[
-                kwj_navigation2 + '/param/costmap_common_params.yaml',
-                kwj_navigation2 + '/param/local_costmap_params.yaml',
-                kwj_navigation2 + '/param/global_costmap_params.yaml',
-                kwj_navigation2 + '/param/move_base_params.yaml',
-                mpc_ros_pkg + '/params/dwa_local_planner_params.yaml'
-            ]
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['0', '0', '0.065', '0', '0', '0', 'base_footprint', 'base_link']
         ),
-
-        # Rviz node
         Node(
-            package='rviz2',
-            executable='rviz2',
-            name='rviz',
-            output='screen',
-            arguments=['-d', kwj_navigation2 + '/rviz/rviz.rviz']
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['0.11', '0', '0.18', '0', '0', '0', 'base_link', 'laser_link']
+        ),
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['-0.07', '0', '0', '0', '0', '0', 'base_link', 'imu_link']
+        ),
+        Node(
+            package='tf2_ros',
+            executable='static_transform_publisher',
+            arguments=['0.193', '0.01', '-0.02', '0', '0', '0', 'base_link', 'caster_front_link']
         ),
     ])
 

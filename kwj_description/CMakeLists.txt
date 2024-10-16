@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.5)
-project(kwj_description1)
+project(kwj_description)
 
 # Default to C99
 if(NOT CMAKE_C_STANDARD)
@@ -20,6 +20,12 @@ find_package(ament_cmake REQUIRED)
 find_package(std_msgs REQUIRED)
 find_package(urdf REQUIRED)
 find_package(xacro REQUIRED)
+
+install(DIRECTORY launch/
+  DESTINATION share/${PROJECT_NAME}/launch)
+install(DIRECTORY urdf/
+  DESTINATION share/${PROJECT_NAME}/urdf)
+
 
 if(BUILD_TESTING)
   find_package(ament_lint_auto REQUIRED)

@@ -41,6 +41,11 @@ ament_target_dependencies(cmd_vel_to_odom
 # Install the executable
 install(TARGETS cmd_vel_to_odom
   RUNTIME DESTINATION lib/${PROJECT_NAME})
+  
+install(
+  DIRECTORY config/
+  DESTINATION share/${PROJECT_NAME}/config
+)
 
 ament_package()
 

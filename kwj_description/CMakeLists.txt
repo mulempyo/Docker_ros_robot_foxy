@@ -21,10 +21,9 @@ find_package(std_msgs REQUIRED)
 find_package(urdf REQUIRED)
 find_package(xacro REQUIRED)
 
-install(DIRECTORY launch/
-  DESTINATION share/${PROJECT_NAME}/launch)
-install(DIRECTORY urdf/
-  DESTINATION share/${PROJECT_NAME}/urdf)
+install(DIRECTORY launch meshes urdf world
+  DESTINATION share/${PROJECT_NAME}
+)
 
 
 if(BUILD_TESTING)
@@ -37,5 +36,6 @@ if(BUILD_TESTING)
   #set(ament_cmake_cpplint_FOUND TRUE)
   ament_lint_auto_find_test_dependencies()
 endif()
+
 
 ament_package()

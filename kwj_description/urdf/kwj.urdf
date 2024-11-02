@@ -1,5 +1,6 @@
 <?xml version="1.0"?>
 <robot name="KWJBot" xmlns:xacro="http://ros.org/wiki/xacro">
+  <xacro:include filename="$(find kwj_description)/urdf/kwj.gazebo.xacro"/>
 
     <link name="base_footprint"/>
    

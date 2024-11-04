@@ -14,7 +14,7 @@ public:
         cmd_vel_sub_ = this->create_subscription<geometry_msgs::msg::Twist>(
             "cmd_vel", 10, std::bind(&OdometryNode::cmdCallback, this, std::placeholders::_1));
         imu_sub_ = this->create_subscription<sensor_msgs::msg::Imu>(
-            "/imu/data", 100, std::bind(&OdometryNode::imuCallback, this, std::placeholders::_1));
+            "/imu", 100, std::bind(&OdometryNode::imuCallback, this, std::placeholders::_1));
 
         last_time_ = this->get_clock()->now();
         timer_ = this->create_wall_timer(

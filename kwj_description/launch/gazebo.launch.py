@@ -6,29 +6,27 @@ from ament_index_python.packages import get_package_share_directory
 import os
 import xacro
 import tempfile
+from launch.substitutions import LaunchConfiguration
 
 def generate_launch_description():
    
-    package_name = 'kwj_description'
-    gazebo_ros_pkg = 'gazebo_ros'
     navigation2_pkg = 'kwj_navigation2'
-
-  
-    urdf_file = os.path.join(get_package_share_directory(package_name), 'urdf', 'kwjbot.urdf')
-    xacro_file = os.path.join(get_package_share_directory(package_name), 'urdf', 'kwj.gazebo.xacro')
-    rviz_config_file = os.path.join(get_package_share_directory(navigation2_pkg), 'rviz', 'default.rviz')
-
+    world_file_name = 'my_world2.world'
+    urdf_file_name = 'kwjbot.urdf'
     
-    try:
-        with open(urdf_file, 'r') as infp:
-            robot_description_content = infp.read()
-    except FileNotFoundError:
-        print(f"Don't find URDF file: {urdf_file}")
-        return LaunchDescription([])
+    pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
+    kwj_description_pkg = get_package_share_directory('kwj_description')
+  
+    xacro_file = os.path.join(kwj_description_pkg, 'urdf', 'kwj.gazebo.xacro')
+    rviz_config_file = os.path.join(get_package_share_directory(navigation2_pkg), 'rviz', 'default.rviz')
+    use_sim_time = LaunchConfiguration('use_sim_time')
+    world = os.path.join(get_package_share_directory('kwj_description'), 'world', world_file_name)
 
-    robot_description = {'robot_description': robot_description_content}
+    urdf = os.path.join(
+        get_package_share_directory('kwj_description'),
+        'urdf',
+        urdf_file_name)
 
-   
     try:
         gazebo_xacro = xacro.process_file(xacro_file)
         gazebo_urdf = gazebo_xacro.toxml()
@@ -40,25 +38,36 @@ def generate_launch_description():
         print(f"Failed to process xacro file: {xacro_file}")
         print(e)
         return LaunchDescription([])
-
+        
     robot_state_publisher_node = Node(
         package='robot_state_publisher',
         executable='robot_state_publisher',
         name='robot_state_publisher',
         output='screen',
-        parameters=[robot_description]
+        parameters=[{'use_sim_time': use_sim_time}],
+        arguments=[urdf]
     )
+    
+    joint_state_publisher_node = Node(
+        package='joint_state_publisher',
+        executable='joint_state_publisher',
+        name='joint_state_publisher',
+        output='screen',
+    )  
+    
+    gazebo_server = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_gazebo_ros, 'launch', 'gzserver.launch.py')
+            ),
+            launch_arguments={'world': world}.items(),
+        )
 
-    gazebo_launch = IncludeLaunchDescription(
-        PythonLaunchDescriptionSource([
-            os.path.join(
-                get_package_share_directory(gazebo_ros_pkg),
-                'launch',
-                'gazebo.launch.py'
-            )
-        ]),
-        launch_arguments={'verbose': 'true'}.items(),
-    )
+    gazebo_client = IncludeLaunchDescription(
+            PythonLaunchDescriptionSource(
+                os.path.join(pkg_gazebo_ros, 'launch', 'gzclient.launch.py')
+            ),
+        )  
+
 
     spawn_entity = Node(
         package='gazebo_ros',
@@ -83,9 +92,16 @@ def generate_launch_description():
     )
 
     return LaunchDescription([
+        DeclareLaunchArgument(
+            'use_sim_time',
+            default_value='true',
+            description='Use simulation (Gazebo) clock if true'),
+            
         robot_state_publisher_node,
-        gazebo_launch,
+        gazebo_client,
+        gazebo_server,
         spawn_entity_with_delay,
+        joint_state_publisher_node,
         rviz_node
     ])
 

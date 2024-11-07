@@ -19,7 +19,7 @@ public:
         last_time_ = this->get_clock()->now();
         timer_ = this->create_wall_timer(
         std::chrono::milliseconds(33), std::bind(&OdometryNode::update_odom, this));
-
+        
     }
 
 private:
@@ -34,20 +34,24 @@ private:
     void update_odom() {
     auto current_time = this->get_clock()->now();
     dt = (current_time - last_time_).seconds();
+    const double PI = 3.141592;
 
-    double left_velocity = cmd_vel_.linear.x - (cmd_vel_.angular.z * WHEEL_BASE / 2.0);
-    double right_velocity = cmd_vel_.linear.x + (cmd_vel_.angular.z * WHEEL_BASE / 2.0);
+    double left_velocity = cmd_vel_.linear.x - (cmd_vel_.angular.z*WHEEL_BASE/2.0); 
+    double right_velocity = cmd_vel_.linear.x + (cmd_vel_.angular.z*WHEEL_BASE/2.0);
+ 
+    vx = (right_velocity + left_velocity)/2; 
+    vth = (right_velocity - left_velocity)/WHEEL_BASE;
 
-    double dist = (left_velocity + right_velocity) / 2.0 * dt;
+    dist = vx * dt;
+
     double dth = imu_yaw_rate * dt;
-
-    double dx = dist * cos(th);
-    double dy = dist * sin(th);
+    double dx = dist*cos(th);
+    double dy = dist*sin(th);
 
     x += dx;
     y += dy;
     th += dth;
-    th = fmod(th + 2 * M_PI, 2 * M_PI);
+    th = fmod(th + 2 * PI, 2 * PI);
 
     tf2::Quaternion quat;
     quat.setRPY(0, 0, th);  // Roll, Pitch, Yaw
@@ -91,7 +95,7 @@ private:
     rclcpp::Time last_time_;
 
     double x, y, th;
-    double dt;
+    double dt, dist;
     double vx, vth;
     double imu_yaw_rate;
     const double WHEEL_BASE;

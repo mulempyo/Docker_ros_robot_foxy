@@ -19,6 +19,7 @@ def generate_launch_description():
     map_dir = LaunchConfiguration('map')
     autostart = LaunchConfiguration('autostart')
     use_rviz = LaunchConfiguration('use_rviz')
+    odom_topic = LaunchConfiguration('odom_topic')
 
     pkg_gazebo_ros = get_package_share_directory('gazebo_ros')
     kwj_description_pkg = get_package_share_directory('kwj_description')
@@ -68,6 +69,12 @@ def generate_launch_description():
         'use_rviz',
         default_value='true',
         description='Whether to launch RViz'
+    )
+    
+    declare_odom_topic_cmd = DeclareLaunchArgument(
+        'odom_topic',
+        default_value='/odometry/filtered',
+        description='Topic name for odometry data'
     )
 
     # Nodes
@@ -142,7 +149,8 @@ def generate_launch_description():
             'use_sim_time': use_sim_time,
             'params_file': params_file,
             'map': map_dir,
-            'autostart': autostart
+            'autostart': autostart,
+            'odom_topic': odom_topic
         }.items()
     )
 
@@ -151,6 +159,7 @@ def generate_launch_description():
 
     # Declare Actions
     ld.add_action(declare_params_file_cmd)
+    ld.add_action(declare_odom_topic_cmd)
     ld.add_action(declare_map_yaml_cmd)
     ld.add_action(declare_autostart_cmd)
     ld.add_action(declare_use_sim_time_cmd)
